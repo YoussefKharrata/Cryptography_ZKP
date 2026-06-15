@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ZKP Authentication — Schnorr + Fiat-Shamir + PKI</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+
+
+
+
+<!-- HEADER -->
+<header>
+    <div class="header-left">
+        <div class="logo-badge">ZKP</div>
+        <div class="header-text">
+            <h1>Zero-Knowledge Proof</h1>
+            <p>Schnorr + Fiat-Shamir + PKI + Simulation d'attaques</p>
+        </div>
+    </div>
+    <div class="header-right">
+        <div class="status-dot"></div>
+        <span class="status-text">Système actif</span>
+        <div class="db-badge" id="db-count">DB: 0 utilisateurs</div>
+        <div class="pki-badge" id="pki-badge" onclick="showPkiModal()">🏛 PKI</div>
+    </div>
+</header>
+
+<!-- MAIN CONTENT -->
+<main>
+
+    <!-- LEFT PANEL -->
+    <aside class="left-panel">
+
+        <!-- AUTH -->
+        <div class="panel-section">
+            <div class="section-label">
+                <span class="label-icon">01</span>
+                <span>Authentification</span>
+            </div>
+            <div class="form-group">
+                <label for="username"><span class="label-icon-sm">▸</span> Identifiant</label>
+                <input type="text" id="username" placeholder="alice" autocomplete="off" spellcheck="false">
+            </div>
+            <div class="form-group">
+                <label for="password">
+                    <span class="label-icon-sm">▸</span> Mot de passe
+                    <span class="secret-badge">secret local</span>
+                </label>
+                <input type="password" id="password" placeholder="••••••••" autocomplete="off">
+                <div class="password-hint">Ne transitera jamais sur le réseau</div>
+            </div>
+            <div class="btn-group">
+                <button class="btn btn-register" onclick="registerUser()">
+                    <span class="btn-icon">+</span><span>Inscrire</span>
+                </button>
+                <button class="btn btn-login" onclick="loginUser()">
+                    <span class="btn-icon">→</span><span>Connexion</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- ATTAQUES -->
+        <div class="panel-section">
+            <div class="section-label">
+                <span class="label-icon">02</span>
+                <span>Simulation d'attaques</span>
+            </div>
+            <div class="attack-grid">
+                <button class="btn btn-attack" onclick="simulateAttack('wrong-password')">
+                    <span class="attack-icon">🔑</span>
+                    <span class="attack-name">Mauvais<br>mot de passe</span>
+                </button>
+                <button class="btn btn-attack" onclick="simulateAttack('replay')">
+                    <span class="attack-icon">🔄</span>
+                    <span class="attack-name">Replay<br>Attack</span>
+                </button>
+                <button class="btn btn-attack" onclick="simulateAttack('forgery')">
+                    <span class="attack-icon">🎭</span>
+                    <span class="attack-name">Forgery<br>(preuve forgée)</span>
+                </button>
+                <button class="btn btn-attack" onclick="simulateAttack('mitm')">
+                    <span class="attack-icon">🕵</span>
+                    <span class="attack-name">Man-in-<br>the-Middle</span>
+                </button>
+            </div>
+            <div class="attack-note">Inscrivez un utilisateur avant de simuler une attaque</div>
+        </div>
+
+        <!-- PRINCIPE ZKP -->
+        <div class="panel-section theory-box">
+            <div class="section-label">
+                <span class="label-icon">03</span>
+                <span>Principe ZKP + PKI</span>
+            </div>
+            <div class="theory-item">
+                <div class="theory-role pki-role">CA (PKI)</div>
+                <div class="theory-desc">Signe le certificat username ↔ Y</div>
+            </div>
+            <div class="theory-arrow">↓ certificat RSA-2048</div>
+            <div class="theory-item">
+                <div class="theory-role prover">Prouveur</div>
+                <div class="theory-desc">Connaît x, génère preuve (R, s)</div>
+            </div>
+            <div class="theory-arrow">↓ preuve mathématique (sans x)</div>
+            <div class="theory-item">
+                <div class="theory-role verifier">Vérificateur</div>
+                <div class="theory-desc">Vérifie cert PKI + G^s × Y^c ≡ R</div>
+            </div>
+            <div class="equation-display">
+                <div class="eq-line">y = G<sup>x</sup> mod P</div>
+                <div class="eq-line">s = r − c·x mod Q</div>
+                <div class="eq-line eq-verify">G<sup>s</sup> · Y<sup>c</sup> ≡ R (mod P)</div>
+            </div>
+        </div>
+
+        <!-- DB VIEWER -->
+        <div class="panel-section db-section">
+            <div class="section-label">
+                <span class="label-icon">04</span>
+                <span>Base de données serveur</span>
+            </div>
+            <div class="db-security-note">
+                <span class="no-icon">✗</span> Aucun mot de passe<br>
+                <span class="no-icon">✗</span> Aucun hash de password<br>
+                <span class="yes-icon">✓</span> Clés publiques Y certifiées PKI
+            </div>
+            <div id="db-display" class="db-display">
+                <span class="db-empty">Base vide — inscrivez un utilisateur</span>
+            </div>
+        </div>
+
+    </aside>
+
+    <!-- RIGHT PANEL: STEPS -->
+    <section class="right-panel">
+        <div class="steps-header">
+            <div class="section-label">
+                <span class="label-icon">→</span>
+                <span>Exécution protocole</span>
+            </div>
+            <button class="clear-btn" onclick="clearSteps()">Effacer</button>
+        </div>
+
+        <div id="idle-state" class="idle-state">
+            <div class="idle-icon">⬡</div>
+            <div class="idle-title">Protocole en attente</div>
+            <div class="idle-desc">Entrez un identifiant et un mot de passe, puis cliquez sur <strong>Inscrire</strong> ou <strong>Connexion</strong>. Ou simulez une <strong>attaque</strong> après inscription.</div>
+            <div class="idle-flow">
+                <div class="flow-node pki-node">CA / PKI</div>
+                <div class="flow-arrow">⟶ cert ⟶</div>
+                <div class="flow-node">Client</div>
+                <div class="flow-arrow">⟶ (R, s) ⟶</div>
+                <div class="flow-node">Serveur</div>
+                <div class="flow-arrow">⟶ ✓ ⟶</div>
+                <div class="flow-node">Résultat</div>
+            </div>
+        </div>
+
+        <div id="steps-container" class="steps-container" style="display:none;"></div>
+        <div id="result-banner" class="result-banner" style="display:none;"></div>
+    </section>
+
+</main>
+
+<!-- PKI MODAL -->
+<div id="pki-modal" class="modal-overlay" style="display:none;" onclick="closePkiModal(event)">
+    <div class="modal-box">
+        <div class="modal-header">
+            <span class="modal-title">🏛 Infrastructure PKI — Autorité de Certification</span>
+            <button class="modal-close" onclick="closePkiModal()">✕</button>
+        </div>
+        <div class="modal-body" id="pki-modal-body">
+            <div class="loading-text">Chargement PKI...</div>
+        </div>
+    </div>
+</div>
+
+<!-- LOADING OVERLAY -->
+<div id="loading" class="loading-overlay" style="display:none;">
+    <div class="loading-content">
+        <div class="loading-spinner"></div>
+        <div class="loading-text" id="loading-text">Calcul cryptographique...</div>
+    </div>
+</div>
+
+<script src="{{ url_for('static', filename='app.js') }}"></script>
+</body>
+</html>
